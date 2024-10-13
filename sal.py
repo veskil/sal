@@ -15,10 +15,10 @@ Tæpp NTNU-kortet ditt på kortleseren for å registrere ankomst eller avreise.
 
 PROMPT = """\
 enter     : nullstill skjerm
-i         : vis instruksjoner
-s         : vis statistikk
-u         : sett brukernavn
-q / quit  : avslutt programmet
+i + enter : vis instruksjoner
+s + enter : vis statistikk
+u + enter : sett nytt brukernavn
+q + enter : avslutt programmet
 > \
 """
 
@@ -72,7 +72,7 @@ def main():
                 clear_and_print("Velkommen " + colorama.Fore.GREEN +
                                 users[last_read_card] + colorama.Fore.RESET + "!\n")
             else:
-                clear_and_print("Kortnummer " + colorama.Fore.RED + user_input
+                clear_and_print("Kortnummer " + colorama.Fore.GREEN + user_input
                                 + colorama.Fore.RESET + " registrert! Gjerne sett et brukernavn!\n")
 
         match user_input:
