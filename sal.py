@@ -43,6 +43,11 @@ NB: KORTET INNEHOLDER TO NUMMER. SJEKK AT DU REGISRERES RIKTIG.
 def highlight(str_to_highlight: str) -> str:
     return colorama.Fore.GREEN + str_to_highlight + colorama.Fore.RESET
 
+def update_username(users: dict[str, str], user_id: str, new_username: str):
+    users[user_id] = new_username
+    with open(USER_JSON_FILE, "w") as f:
+        json.dump(users, f, indent=0)
+
 def clear_and_print(message):
     os.system("clear")
     print(message)
@@ -73,6 +78,7 @@ def main():
             if last_read_card in users:
                 clear_and_print("Velkommen " + highlight(users[last_read_card]) + "!\n")
             else:
+                update_username(users, last_read_card, last_read_card)
                 clear_and_print("Kortnummer " + highlight(user_input) + " registrert! Gjerne sett et brukernavn!\n")
 
 
@@ -96,9 +102,7 @@ def main():
                     clear_and_print("Må tæppe kort først!\n")
                 else:
                     new_username = input(f"Skriv inn brukernavn for kort med nummer {highlight(last_read_card)}: ")
-                    users[last_read_card] = new_username
-                    with open(USER_JSON_FILE, "w") as f:
-                        json.dump(users, f, indent=0)
+                    update_username(users, last_read_card, new_username)
                     clear_and_print(f"Brukernavn {highlight(new_username)} registrert for kort {highlight(last_read_card)}")
 
 
