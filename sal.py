@@ -65,7 +65,7 @@ def main():
     with open(USER_JSON_FILE, "r") as f:
         users: dict[str, str] = json.load(f)
     user_input = "dummy"
-    last_read_card = None
+    logged_in_user_id = None
     clear_and_print(GREETING)
 
     while user_input.lower() not in ["q", "quit"]:
@@ -73,19 +73,19 @@ def main():
 
         # Log card read
         if user_input.isnumeric() and len(user_input) == 10:
-            last_read_card = user_input
-            log_entry(last_read_card)
-            if last_read_card in users:
-                clear_and_print("Velkommen " + highlight(users[last_read_card]) + "!\n")
+            logged_in_user_id = user_input
+            log_entry(logged_in_user_id)
+            if logged_in_user_id in users:
+                clear_and_print("Velkommen " + highlight(users[logged_in_user_id]) + "!\n")
             else:
-                update_username(users, last_read_card, last_read_card)
+                update_username(users, logged_in_user_id, logged_in_user_id)
                 clear_and_print("Kortnummer " + highlight(user_input) + " registrert! Gjerne sett et brukernavn!\n")
 
 
         match user_input:
-            # Reset screen / program
+            # Log out / reset screen
             case "":
-                last_read_card = None
+                logged_in_user_id = None
                 clear_and_print(GREETING)
 
             # Show instructions
@@ -98,12 +98,12 @@ def main():
 
             # Change username
             case "u":
-                if last_read_card is None:
+                if logged_in_user_id is None:
                     clear_and_print("Må tæppe kort først!\n")
                 else:
-                    new_username = input(f"Skriv inn brukernavn for kort med nummer {highlight(last_read_card)}: ")
-                    update_username(users, last_read_card, new_username)
-                    clear_and_print(f"Brukernavn {highlight(new_username)} registrert for kort {highlight(last_read_card)}")
+                    new_username = input(f"Skriv inn brukernavn for kort med nummer {highlight(logged_in_user_id)}: ")
+                    update_username(users, logged_in_user_id, new_username)
+                    clear_and_print(f"Brukernavn {highlight(new_username)} registrert for kort {highlight(logged_in_user_id)}")
 
 
 if __name__ == "__main__":
