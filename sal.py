@@ -44,8 +44,8 @@ def highlight(str_to_highlight: str) -> str:
     return colorama.Fore.GREEN + str_to_highlight + colorama.Fore.RESET
 
 
-def update_username(users: dict[str, str], user_id: str, new_username: str):
-    users[user_id] = new_username
+def update_username(users: dict[str, str], card_num: str, new_username: str):
+    users[card_num] = new_username
     with open(USER_JSON_FILE, "w") as f:
         json.dump(users, f, indent=0)
 
@@ -67,7 +67,7 @@ def main():
     with open(USER_JSON_FILE, "r") as f:
         users: dict[str, str] = json.load(f)
     user_input = "dummy"
-    logged_in_user_id = None
+    logged_in_card_num = None
     clear_and_print(GREETING)
 
     while user_input.lower() not in ["q", "quit"]:
@@ -75,20 +75,20 @@ def main():
 
         # Log card read
         if user_input.isnumeric() and len(user_input) == 10:
-            logged_in_user_id = user_input
-            log_entry(logged_in_user_id)
-            if logged_in_user_id in users:
-                clear_and_print("Velkommen " + highlight(users[logged_in_user_id]) + "!\n")
+            logged_in_card_num = user_input
+            log_entry(logged_in_card_num)
+            if logged_in_card_num in users:
+                clear_and_print("Velkommen " + highlight(users[logged_in_card_num]) + "!\n")
             else:
-                update_username(users, logged_in_user_id, logged_in_user_id)
-                clear_and_print("Kortnummer " + highlight(user_input)
-                                + " registrert! Gjerne sett et brukernavn!\n")
+                update_username(users, logged_in_card_num, logged_in_card_num)
+                clear_and_print("Velkommen " + highlight(logged_in_card_num)
+                                + "! Gjerne sett et brukernavn ved å trykke 'u', deretter 'enter'!\n")
 
 
         match user_input:
             # Log out / reset screen
             case "":
-                logged_in_user_id = None
+                logged_in_card_num = None
                 clear_and_print(GREETING)
 
             # Show instructions
@@ -101,12 +101,12 @@ def main():
 
             # Change username
             case "u":
-                if logged_in_user_id is None:
+                if logged_in_card_num is None:
                     clear_and_print("Må tæppe kort først!\n")
                 else:
-                    new_username = input(f"Skriv inn brukernavn for kort med nummer {highlight(logged_in_user_id)}: ")
-                    update_username(users, logged_in_user_id, new_username)
-                    clear_and_print(f"Brukernavn {highlight(new_username)} registrert for kort {highlight(logged_in_user_id)}")
+                    new_username = input(f"Skriv inn brukernavn for kort med nummer {highlight(logged_in_card_num)}: ")
+                    update_username(users, logged_in_card_num, new_username)
+                    clear_and_print(f"Brukernavn {highlight(new_username)} registrert for kort {highlight(logged_in_card_num)}")
 
 
 if __name__ == "__main__":
