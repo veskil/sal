@@ -43,10 +43,12 @@ NB: KORTET INNEHOLDER TO NUMMER. SJEKK AT DU REGISRERES RIKTIG.
 def highlight(str_to_highlight: str) -> str:
     return colorama.Fore.GREEN + str_to_highlight + colorama.Fore.RESET
 
+
 def update_username(users: dict[str, str], user_id: str, new_username: str):
     users[user_id] = new_username
     with open(USER_JSON_FILE, "w") as f:
         json.dump(users, f, indent=0)
+
 
 def clear_and_print(message):
     os.system("clear")
@@ -79,7 +81,8 @@ def main():
                 clear_and_print("Velkommen " + highlight(users[logged_in_user_id]) + "!\n")
             else:
                 update_username(users, logged_in_user_id, logged_in_user_id)
-                clear_and_print("Kortnummer " + highlight(user_input) + " registrert! Gjerne sett et brukernavn!\n")
+                clear_and_print("Kortnummer " + highlight(user_input)
+                                + " registrert! Gjerne sett et brukernavn!\n")
 
 
         match user_input:
