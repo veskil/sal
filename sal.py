@@ -40,6 +40,8 @@ NB: KORTET INNEHOLDER TO NUMMER. SJEKK AT DU REGISRERES RIKTIG.
 *Dagen begynner 05:00 og slutter 04:59 neste dag.
 """
 
+def highlight(str_to_highlight: str) -> str:
+    return colorama.Fore.GREEN + str_to_highlight + colorama.Fore.RESET
 
 def clear_and_print(message):
     os.system("clear")
@@ -69,11 +71,10 @@ def main():
             last_read_card = user_input
             log_entry(last_read_card)
             if last_read_card in users:
-                clear_and_print("Velkommen " + colorama.Fore.GREEN +
-                                users[last_read_card] + colorama.Fore.RESET + "!\n")
+                clear_and_print("Velkommen " + highlight(users[last_read_card]) + "!\n")
             else:
-                clear_and_print("Kortnummer " + colorama.Fore.GREEN + user_input
-                                + colorama.Fore.RESET + " registrert! Gjerne sett et brukernavn!\n")
+                clear_and_print("Kortnummer " + highlight(user_input) + " registrert! Gjerne sett et brukernavn!\n")
+
 
         match user_input:
             # Reset screen / program
@@ -94,11 +95,11 @@ def main():
                 if last_read_card is None:
                     clear_and_print("Må tæppe kort først!\n")
                 else:
-                    new_username = input(f"Skriv inn brukernavn for kort med nummer {last_read_card}: ")
+                    new_username = input(f"Skriv inn brukernavn for kort med nummer {highlight(last_read_card)}: ")
                     users[last_read_card] = new_username
                     with open(USER_JSON_FILE, "w") as f:
                         json.dump(users, f, indent=0)
-                    clear_and_print(f"Brukernavn {new_username} registrert for kort {last_read_card}")
+                    clear_and_print(f"Brukernavn {highlight(new_username)} registrert for kort {highlight(last_read_card)}")
 
 
 if __name__ == "__main__":
