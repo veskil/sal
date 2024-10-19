@@ -77,13 +77,11 @@ def main():
         if user_input.isnumeric() and len(user_input) == 10:
             logged_in_card_num = user_input
             log_entry(logged_in_card_num)
-            if logged_in_card_num in users:
-                clear_and_print("Velkommen " + highlight(users[logged_in_card_num]) + "!\n")
-            else:
+            if logged_in_card_num not in users:
                 update_username(users, logged_in_card_num, logged_in_card_num)
-                clear_and_print("Velkommen " + highlight(logged_in_card_num)
-                                + "! Gjerne sett et brukernavn ved å trykke 'u', deretter 'enter'!\n")
-
+            clear_and_print("Velkommen " + highlight(users[logged_in_card_num]) + "!")
+            if logged_in_card_num == users[logged_in_card_num]:
+                print("Du kan sette et brukernavn ved å trykke 'u' etterfulgt av 'enter'.\n")
 
         match user_input:
             # Log out / reset screen
