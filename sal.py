@@ -162,7 +162,7 @@ def main():
             # Admin feature, rerun stat counts
             case "RERUN":
                 for logfile in sorted(os.listdir(LOG_DIR)):
-                    for line in (LOG_DIR / logfile).read_text().split("\n"):
+                    for line in (LOG_DIR / logfile).read_text().split("\n")[:-1]:
                         timestamp, card_num = line.split(",")
                         update_stats(User(card_num, usernames), dt.datetime.fromisoformat(timestamp))
 
