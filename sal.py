@@ -3,9 +3,12 @@ import datetime as dt
 import os
 import colorama
 import json
+import pandas as pd
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).parent
 LOG_DIR = ROOT / "logs/"
+STATS_DIR = ROOT / "stats/"
 USER_JSON_FILE = ROOT / "users.json"
 
 GREETING = """\
@@ -55,17 +58,47 @@ def clear_and_print(message):
     print(message)
 
 
-def log_entry(card_num: str) -> None:
-    now = dt.datetime.now(tz=dt.UTC)
-    log_message = f"{now.isoformat()},{card_num}\n"
-    log_file = LOG_DIR / (now.strftime("%Y%m%d") + ".log")
+def log_entry(card_num: str, timestamp: dt.datetime) -> None:
+    log_message = f"{timestamp.isoformat()},{card_num}\n"
+    log_file = LOG_DIR / (timestamp.strftime("%Y%m%d") + ".log")
     with open(log_file, "a") as file:
         file.write(log_message)
 
 
+def update_stats(user_stat_df: pd.DataFrame, timestamp: dt.datetime):
+    local_datetime = timestamp.astimezone(ZoneInfo("Europe/Oslo"))
+    local_time = local_datetime.time()
+    effective_date = (local_datetime - dt.timedelta(hours=5)).date()
+    last_entry_effective_date = user_stat_df.iloc[-1].loc["date"]
+    if last_entry_effective_date == effective_date:
+        user_stat_df.iloc[-1].loc["last_tap_time"] = local_time
+    else:
+        num_days_since_last_entry = (effective_date - last_entry_effective_date).days
+        num_weekdays_since_last_entry = sum([((last_entry_effective_date + dt.timedelta(days=x)).isoweekday() < 6)
+                                              for x in range(num_days_since_last_entry)])
+        current_streak = (user_stat_df.iloc[-1].loc["current_streak"] + 1) if num_weekdays_since_last_entry <= 1 else 1
+        user_stat_df.iloc[len(user_stat_df.index)] = {
+            "date":effective_date,
+            "first_tap_time":local_time,
+            "last_tap_time":local_time,
+            "current_streak":current_streak
+        }
+
+
 def main():
     with open(USER_JSON_FILE, "r") as f:
-        users: dict[str, str] = json.load(f)
+        usernames: dict[str, str] = json.load(f)
+
+    # Load user statistics
+    user_stat_dfs: dict[str, pd.DataFrame] = dict()
+    for username in usernames.values():
+        user_stat_path = STATS_DIR / f"{username}.feather"
+        if user_stat_path.exists():
+            user_stat_dfs[username] = pd.read_feather(user_stat_path)
+        else:
+            user_stat_dfs[username] = pd.DataFrame(columns=["date", "first_tap_time", "last_tap_time", "current_streak"])
+            user_stat_dfs[username].to_feather(user_stat_path)
+
     user_input = "dummy"
     logged_in_card_num = None
     clear_and_print(GREETING)
@@ -76,12 +109,15 @@ def main():
         # Log card read
         if user_input.isnumeric() and len(user_input) == 10:
             logged_in_card_num = user_input
-            log_entry(logged_in_card_num)
-            if logged_in_card_num not in users:
-                update_username(users, logged_in_card_num, logged_in_card_num)
-            clear_and_print("Velkommen " + highlight(users[logged_in_card_num]) + "!")
-            if logged_in_card_num == users[logged_in_card_num]:
-                print("Du kan sette et brukernavn ved å trykke 'u' etterfulgt av 'enter'.\n")
+            now = dt.datetime.now(tz=dt.UTC)
+            log_entry(logged_in_card_num, now)
+            update_stats(user_stat_dfs["username"], now)
+            user_stat_dfs[username].to_feather(user_stat_path)
+            if logged_in_card_num not in usernames:
+                update_username(usernames, logged_in_card_num, logged_in_card_num)
+            clear_and_print("Velkommen " + highlight(usernames[logged_in_card_num]) + "!")
+            if logged_in_card_num == usernames[logged_in_card_num]:
+                print("Du kan sette et brukernavn ved å trykke 'u' etterfulgt av 'enter'.")
 
         match user_input:
             # Log out / reset screen
@@ -103,7 +139,7 @@ def main():
                     clear_and_print("Må tæppe kort først!\n")
                 else:
                     new_username = input(f"Skriv inn brukernavn for kort med nummer {highlight(logged_in_card_num)}: ")
-                    update_username(users, logged_in_card_num, new_username)
+                    update_username(usernames, logged_in_card_num, new_username)
                     clear_and_print(f"Brukernavn {highlight(new_username)} registrert for kort {highlight(logged_in_card_num)}")
 
 
