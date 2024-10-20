@@ -159,6 +159,12 @@ def main():
                     update_username(usernames, logged_in_user.card_num, new_username)
                     clear_and_print(f"Brukernavn {highlight(new_username)} registrert for kort {highlight(logged_in_user.card_num)}")
 
+            # Admin feature, rerun stat counts
+            case "RERUN":
+                for logfile in sorted(os.listdir(LOG_DIR)):
+                    for line in (LOG_DIR / logfile).read_text().split("\n")[:-1]:
+                        timestamp, card_num = line.split(",")
+                        update_stats(User(card_num, usernames), dt.datetime.fromisoformat(timestamp))
 
 if __name__ == "__main__":
     main()
