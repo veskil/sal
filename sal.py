@@ -85,15 +85,23 @@ def update_stats(user: User, timestamp: dt.datetime):
     local_datetime = timestamp.astimezone(ZoneInfo("Europe/Oslo"))
     local_time = local_datetime.time()
     effective_date = (local_datetime - dt.timedelta(hours=5)).date()
-    last_entry_effective_date = user.stat_df.iloc[-1].loc["date"]
-    if last_entry_effective_date == effective_date:
-        user.stat_df.iloc[-1].loc["last_tap_time"] = local_time
+    len_df = len(user.stat_df.index)
+    if len_df == 0:
+        user.stat_df.loc[0] = {
+            "date":effective_date,
+            "first_tap_time":local_time,
+            "last_tap_time":local_time,
+            "current_streak":1
+        }
+    elif user.stat_df.loc[len_df - 1, "date"] == effective_date:
+        user.stat_df.loc[len_df - 1, "last_tap_time"] = local_time
     else:
+        last_entry_effective_date = user.stat_df.loc[len_df - 1, "date"]
         num_days_since_last_entry = (effective_date - last_entry_effective_date).days
         num_weekdays_since_last_entry = sum([((last_entry_effective_date + dt.timedelta(days=x)).isoweekday() < 6)
                                               for x in range(num_days_since_last_entry)])
-        current_streak = (user.stat_df.iloc[-1].loc["current_streak"] + 1) if num_weekdays_since_last_entry <= 1 else 1
-        user.stat_df.iloc[len(user.stat_df.index)] = {
+        current_streak = (user.stat_df.loc[len_df - 1, "current_streak"] + 1) if num_weekdays_since_last_entry <= 1 else 1
+        user.stat_df.loc[len(user.stat_df.index)] = {
             "date":effective_date,
             "first_tap_time":local_time,
             "last_tap_time":local_time,
