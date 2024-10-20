@@ -148,7 +148,7 @@ def main():
 
             # Show statistics
             case "s":
-                clear_and_print("Brukerstatistikk er ikke implementert ennå :(\n")
+                clear_and_print("Mer statistikk kommer etter hvert!\n")
 
             # Change username
             case "u":
