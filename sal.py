@@ -101,6 +101,7 @@ def main():
 
     user_input = "dummy"
     logged_in_card_num = None
+    logged_in_username = None
     clear_and_print(GREETING)
 
     while user_input.lower() not in ["q", "quit"]:
@@ -109,20 +110,29 @@ def main():
         # Log card read
         if user_input.isnumeric() and len(user_input) == 10:
             logged_in_card_num = user_input
-            now = dt.datetime.now(tz=dt.UTC)
-            log_entry(logged_in_card_num, now)
-            update_stats(user_stat_dfs["username"], now)
-            user_stat_dfs[username].to_feather(user_stat_path)
+
+            # Find username
             if logged_in_card_num not in usernames:
                 update_username(usernames, logged_in_card_num, logged_in_card_num)
+            logged_in_username = usernames[logged_in_card_num]
+
+            # Print hello message
             clear_and_print("Velkommen " + highlight(usernames[logged_in_card_num]) + "!")
-            if logged_in_card_num == usernames[logged_in_card_num]:
+            if logged_in_card_num == logged_in_username:
                 print("Du kan sette et brukernavn ved å trykke 'u' etterfulgt av 'enter'.")
+
+            # Log entry and update stats, print streak
+            now = dt.datetime.now(tz=dt.UTC)
+            log_entry(logged_in_card_num, now)
+            update_stats(user_stat_dfs[logged_in_username], now)
+            user_stat_dfs[username].to_feather(user_stat_path)
+            print(("🔥" * user_stat_dfs[username].iloc[-1].loc["current_streak"]) + "\n")
 
         match user_input:
             # Log out / reset screen
             case "":
                 logged_in_card_num = None
+                logged_in_username = None
                 clear_and_print(GREETING)
 
             # Show instructions
