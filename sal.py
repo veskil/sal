@@ -127,8 +127,8 @@ def get_statistics_message(user: User) -> str:
         f"Antall oppmøtedager siste syv dager: {num_days_last_7}\n"
         f"Antall oppmøtedager siste tretti dager: {num_days_last_30}\n"
         f"Lengste dag: {longest_day_date}, {longest_day_duration:.0f} timer\n"
-        f"Tidligste oppmøte: {earliest_arrival.strftime("%H:%M:%S")}\n"
-        f"Seneste avreise: {latest_departure.strftime("%H:%M:%S")}\n"
+        f"Tidligste oppmøte: {earliest_arrival.strftime('%H:%M:%S')}\n"
+        f"Seneste avreise: {latest_departure.strftime('%H:%M:%S')}\n"
     )
     return message
 
