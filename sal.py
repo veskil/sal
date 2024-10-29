@@ -91,10 +91,12 @@ def update_stats(user: User, timestamp: dt.datetime):
             "date":effective_date,
             "first_tap_time":local_time,
             "last_tap_time":local_time,
+            "hours":0,
             "current_streak":1
         }
     elif user.stat_df.loc[len_df - 1, "date"] == effective_date:
         user.stat_df.loc[len_df - 1, "last_tap_time"] = local_time
+        user.stat_df.loc[len_df - 1, "hours"] = (user.stat_df.loc[len_df - 1, "first_tap_time"] - user.stat_df.loc[len_df - 1, "first_tap_time"]).total_seconds() / 3600
     else:
         last_entry_effective_date = user.stat_df.loc[len_df - 1, "date"]
         num_days_since_last_entry = (effective_date - last_entry_effective_date).days
@@ -105,9 +107,31 @@ def update_stats(user: User, timestamp: dt.datetime):
             "date":effective_date,
             "first_tap_time":local_time,
             "last_tap_time":local_time,
+            "hours":0,
             "current_streak":current_streak
         }
     user.stat_df.to_feather(user.stat_path)
+
+
+def get_statistics_message(user: User) -> str:
+    today = user.stat_df.loc[user.stat_df.index[-1], "date"]
+    num_days_total = user.stat_df.count()
+    num_days_last_30 = user.stat_df[(today - user.stat_df["date"]).dt.days < 30].count()
+    num_days_last_7 = user.stat_df[(today - user.stat_df["date"]).dt.days < 7].count()
+    longest_day_date = user.stat_df.loc[user.stat_df["hours"].argmax(), "date"]
+    longest_day_duration = user.stat_df["hours"].max()
+    earliest_arrival = (user.stat_df["first_tap_time"] - dt.timedelta(hours=5)).min() + dt.timedelta(hours=5)
+    latest_departure = (user.stat_df["last_tap_tim"] - dt.timedelta(hours=5)).max() + dt.timedelta(hours=5)
+
+    message = (
+        f"Antall oppmøtedager totalt: {num_days_total}\n"
+        f"Antall oppmøtedager siste syv dager: {num_days_last_7}\n"
+        f"Antall oppmøtedager siste tretti dager: {num_days_last_30}\n"
+        f"Lengste dag: {longest_day_date}, {longest_day_duration:.0f} timer\n"
+        f"Tidligste oppmøte: {earliest_arrival}\n"
+        f"Seneste avreise: {latest_departure}\n"
+    )
+    return message
 
 
 def main():
@@ -148,7 +172,7 @@ def main():
 
             # Show statistics
             case "s":
-                clear_and_print("Mer statistikk kommer etter hvert!\n")
+                clear_and_print(get_statistics_message(logged_in_user))
 
             # Change username
             case "u":
