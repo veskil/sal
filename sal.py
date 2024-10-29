@@ -184,6 +184,8 @@ def main():
 
             # Admin feature, rerun stat counts
             case "RERUN":
+                for statsfile in os.listdir(STATS_DIR):
+                    os.remove(STATS_DIR / statsfile)
                 for logfile in sorted(os.listdir(LOG_DIR)):
                     for line in (LOG_DIR / logfile).read_text().split("\n")[:-1]:
                         timestamp, card_num = line.split(",")
