@@ -83,19 +83,18 @@ def log_entry(user: User, timestamp: dt.datetime) -> None:
 
 def update_stats(user: User, timestamp: dt.datetime):
     local_datetime = timestamp.astimezone(ZoneInfo("Europe/Oslo"))
-    local_time = local_datetime.time()
     effective_date = (local_datetime - dt.timedelta(hours=5)).date()
     len_df = len(user.stat_df.index)
     if len_df == 0:
         user.stat_df.loc[0] = {
             "date":effective_date,
-            "first_tap_time":local_time,
-            "last_tap_time":local_time,
+            "first_tap_time":timestamp,
+            "last_tap_time":timestamp,
             "hours":0,
             "current_streak":1
         }
     elif user.stat_df.loc[len_df - 1, "date"] == effective_date:
-        user.stat_df.loc[len_df - 1, "last_tap_time"] = local_time
+        user.stat_df.loc[len_df - 1, "last_tap_time"] = timestamp
         user.stat_df.loc[len_df - 1, "hours"] = (user.stat_df.loc[len_df - 1, "first_tap_time"] - user.stat_df.loc[len_df - 1, "first_tap_time"]).total_seconds() / 3600
     else:
         last_entry_effective_date = user.stat_df.loc[len_df - 1, "date"]
@@ -105,8 +104,8 @@ def update_stats(user: User, timestamp: dt.datetime):
         current_streak = (user.stat_df.loc[len_df - 1, "current_streak"] + 1) if num_weekdays_since_last_entry <= 1 else 1
         user.stat_df.loc[len(user.stat_df.index)] = {
             "date":effective_date,
-            "first_tap_time":local_time,
-            "last_tap_time":local_time,
+            "first_tap_time":timestamp,
+            "last_tap_time":timestamp,
             "hours":0,
             "current_streak":current_streak
         }
@@ -115,21 +114,21 @@ def update_stats(user: User, timestamp: dt.datetime):
 
 def get_statistics_message(user: User) -> str:
     today = user.stat_df.loc[user.stat_df.index[-1], "date"]
-    num_days_total = user.stat_df.count()
-    num_days_last_30 = user.stat_df[(today - user.stat_df["date"]).dt.days < 30].count()
-    num_days_last_7 = user.stat_df[(today - user.stat_df["date"]).dt.days < 7].count()
+    num_days_total = len(user.stat_df)
+    num_days_last_30 = len(user.stat_df[today - user.stat_df["date"] < dt.timedelta(days=30)])
+    num_days_last_7 = len(user.stat_df[today - user.stat_df["date"] < dt.timedelta(days=7)])
     longest_day_date = user.stat_df.loc[user.stat_df["hours"].argmax(), "date"]
     longest_day_duration = user.stat_df["hours"].max()
     earliest_arrival = (user.stat_df["first_tap_time"] - dt.timedelta(hours=5)).min() + dt.timedelta(hours=5)
-    latest_departure = (user.stat_df["last_tap_tim"] - dt.timedelta(hours=5)).max() + dt.timedelta(hours=5)
+    latest_departure = (user.stat_df["last_tap_time"] - dt.timedelta(hours=5)).max() + dt.timedelta(hours=5)
 
     message = (
         f"Antall oppmøtedager totalt: {num_days_total}\n"
         f"Antall oppmøtedager siste syv dager: {num_days_last_7}\n"
         f"Antall oppmøtedager siste tretti dager: {num_days_last_30}\n"
         f"Lengste dag: {longest_day_date}, {longest_day_duration:.0f} timer\n"
-        f"Tidligste oppmøte: {earliest_arrival}\n"
-        f"Seneste avreise: {latest_departure}\n"
+        f"Tidligste oppmøte: {earliest_arrival.strftime("%H:%M:%S")}\n"
+        f"Seneste avreise: {latest_departure.strftime("%H:%M:%S")}\n"
     )
     return message
 
