@@ -124,7 +124,7 @@ def get_statistics_message(user: User) -> str:
     latest_departure = user.stat_df.loc[user.stat_df["last_tap_time"].apply(lambda t: (t - dt.timedelta(hours=5)).time()).argmax(), "last_tap_time"]
 
     message = (
-        f"Nåværende streak: {current_streak}"
+        f"Nåværende streak: {current_streak}\n"
         f"Antall oppmøtedager totalt: {num_days_total}\n"
         f"Antall oppmøtedager siste syv dager: {num_days_last_7}\n"
         f"Antall oppmøtedager siste tretti dager: {num_days_last_30}\n"
