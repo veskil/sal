@@ -114,15 +114,17 @@ def update_stats(user: User, timestamp: dt.datetime):
 
 def get_statistics_message(user: User) -> str:
     today = user.stat_df.loc[user.stat_df.index[-1], "date"]
+    current_streak = user.stat_df.iloc[-1]["current_streak"]
     num_days_total = len(user.stat_df)
     num_days_last_30 = len(user.stat_df[today - user.stat_df["date"] < dt.timedelta(days=30)])
     num_days_last_7 = len(user.stat_df[today - user.stat_df["date"] < dt.timedelta(days=7)])
     longest_day_date = user.stat_df.loc[user.stat_df["hours"].argmax(), "date"]
     longest_day_duration = user.stat_df["hours"].max()
-    earliest_arrival = (user.stat_df["first_tap_time"] - dt.timedelta(hours=5)).min() + dt.timedelta(hours=5)
-    latest_departure = (user.stat_df["last_tap_time"] - dt.timedelta(hours=5)).max() + dt.timedelta(hours=5)
+    earliest_arrival = user.stat_df.loc[user.stat_df["first_tap_time"].apply(lambda t: (t - dt.timedelta(hours=5)).time()).argmin(), "first_tap_time"]
+    latest_departure = user.stat_df.loc[user.stat_df["last_tap_time"].apply(lambda t: (t - dt.timedelta(hours=5)).time()).argmax(), "last_tap_time"]
 
     message = (
+        f"Nåværende streak: {current_streak}"
         f"Antall oppmøtedager totalt: {num_days_total}\n"
         f"Antall oppmøtedager siste syv dager: {num_days_last_7}\n"
         f"Antall oppmøtedager siste tretti dager: {num_days_last_30}\n"
