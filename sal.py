@@ -95,7 +95,7 @@ def update_stats(user: User, timestamp: dt.datetime):
         }
     elif user.stat_df.loc[len_df - 1, "date"] == effective_date:
         user.stat_df.loc[len_df - 1, "last_tap_time"] = local_datetime
-        user.stat_df.loc[len_df - 1, "hours"] = (user.stat_df.loc[len_df - 1, "first_tap_time"] - user.stat_df.loc[len_df - 1, "first_tap_time"]).total_seconds() / 3600
+        user.stat_df.loc[len_df - 1, "hours"] = (user.stat_df.loc[len_df - 1, "last_tap_time"] - user.stat_df.loc[len_df - 1, "first_tap_time"]).total_seconds() / 3600
     else:
         last_entry_effective_date = user.stat_df.loc[len_df - 1, "date"]
         num_days_since_last_entry = (effective_date - last_entry_effective_date).days
