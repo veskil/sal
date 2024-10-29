@@ -88,13 +88,13 @@ def update_stats(user: User, timestamp: dt.datetime):
     if len_df == 0:
         user.stat_df.loc[0] = {
             "date":effective_date,
-            "first_tap_time":timestamp,
-            "last_tap_time":timestamp,
+            "first_tap_time":local_datetime,
+            "last_tap_time":local_datetime,
             "hours":0,
             "current_streak":1
         }
     elif user.stat_df.loc[len_df - 1, "date"] == effective_date:
-        user.stat_df.loc[len_df - 1, "last_tap_time"] = timestamp
+        user.stat_df.loc[len_df - 1, "last_tap_time"] = local_datetime
         user.stat_df.loc[len_df - 1, "hours"] = (user.stat_df.loc[len_df - 1, "first_tap_time"] - user.stat_df.loc[len_df - 1, "first_tap_time"]).total_seconds() / 3600
     else:
         last_entry_effective_date = user.stat_df.loc[len_df - 1, "date"]
@@ -104,8 +104,8 @@ def update_stats(user: User, timestamp: dt.datetime):
         current_streak = (user.stat_df.loc[len_df - 1, "current_streak"] + 1) if num_weekdays_since_last_entry <= 1 else 1
         user.stat_df.loc[len(user.stat_df.index)] = {
             "date":effective_date,
-            "first_tap_time":timestamp,
-            "last_tap_time":timestamp,
+            "first_tap_time":local_datetime,
+            "last_tap_time":local_datetime,
             "hours":0,
             "current_streak":current_streak
         }
