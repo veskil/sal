@@ -173,7 +173,10 @@ def main():
 
             # Show statistics
             case "s":
-                clear_and_print(get_statistics_message(logged_in_user))
+                if logged_in_user is None:
+                    clear_and_print("Må tæppe kort først!\n")
+                else:
+                    clear_and_print(get_statistics_message(logged_in_user))
 
             # Change username
             case "u":
