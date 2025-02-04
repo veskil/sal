@@ -94,7 +94,7 @@ pub fn dump() -> io::Result<()> {
     let conn = get_db();
 
     let mut logs_stmt = conn
-        .prepare("SELECT id, timestamp FROM logs ORDER BY timestamp DESC")
+        .prepare("SELECT id, timestamp FROM logs ORDER BY timestamp ASC")
         .unwrap();
 
     let mut days = HashMap::new();
