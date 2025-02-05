@@ -57,7 +57,7 @@ pub struct App {
     current_user: Option<Person>,
 }
 
-const TIMEOUT: Duration = Duration::from_millis(100);
+const TIMEOUT: Duration = Duration::from_millis(20);
 
 impl App {
     fn new() -> Self {
@@ -70,6 +70,9 @@ impl App {
     }
 
     fn on_tick(&mut self) {
+        // Needed in case the card input is spread on two ticks
+        // Which is quite common when the tick rate is only 200ms
+        // Higher tick rate makes the program feel slow
         if self.last_input.elapsed() > TIMEOUT {
             self.process_buffer();
             self.buffer.clear();
@@ -79,7 +82,8 @@ impl App {
 
     /// runs the application's main loop until the user quits
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        let tick_rate = Duration::from_millis(250);
+        // 5 fps
+        let tick_rate = Duration::from_millis(200);
 
         let mut last_tick = Instant::now();
         while !self.exit {
@@ -115,7 +119,10 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Char(c) => self.buffer.push(c),
+            KeyCode::Char(c) => {
+                self.buffer.push(c);
+                self.last_input = Instant::now();
+            }
             KeyCode::Left => self.decrement_counter(),
             KeyCode::Right => self.increment_counter(),
             KeyCode::Esc => self.exit = true,
@@ -124,6 +131,9 @@ impl App {
     }
 
     fn process_buffer(&mut self) {
+        // if self.buffer.len() > 0 {
+        //     println!("{}", self.buffer);
+        // }
         if self.buffer.len() == 10 {
             let Ok(uid): Result<u64, _> = self.buffer.parse() else {
                 return;
@@ -134,13 +144,17 @@ impl App {
             let c = self.buffer.chars().next().unwrap();
             match c.to_ascii_lowercase() {
                 'q' => self.exit = true,
-                'm' => self.beep_user(325130162),
+                'm' => self.beep_user(394769250),
+                'n' => self.beep_user(394769250),
+                'b' => self.current_user = None,
                 _ => (),
             }
         }
     }
 
     fn beep_user(&mut self, uid: u64) {
+        Person::register(uid);
+
         self.current_user = Some(Person::load(uid));
     }
 
@@ -174,6 +188,7 @@ impl Widget for &App {
                         "Velkommen ".into(),
                         user.username.to_string().yellow(),
                     ]),
+                    Line::from(vec!["🔥".repeat(user.stats.streak).into()]),
                     Line::from(longest_day),
                 ])
             }
