@@ -168,7 +168,7 @@ impl Widget for &App {
         let text = match &self.current_user {
             None => Text::from(vec![Line::from(vec!["Utlogget".yellow()])]),
             Some(user) => {
-                let longest_day = user.stats.longest_day.to_string();
+                let longest_day = user.stats.longest_day.to_span();
                 Text::from(vec![
                     Line::from(vec![
                         "Velkommen ".into(),

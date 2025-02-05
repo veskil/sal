@@ -1,12 +1,8 @@
 use chrono::{DateTime, TimeDelta, Utc};
-use ratatui::{
-    style::Stylize,
-    text::Span,
-};
+use ratatui::{style::Stylize, text::Span};
 use rusqlite::Connection;
 
 pub fn get_db() -> Connection {
-    
     Connection::open("sal.db").unwrap()
 }
 
@@ -25,7 +21,7 @@ pub struct Person {
     pub stats: Stats,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct Stats {
     pub longest_day: Day,
 }
@@ -105,7 +101,7 @@ impl Day {
         Self { start, end }
     }
 
-    pub fn to_string(&self) -> Vec<Span<'_>> {
+    pub fn to_span(&self) -> Vec<Span<'_>> {
         let diff = self.end - self.start;
         let diff_formatted = format!(
             "{} timer og {} minutter",
