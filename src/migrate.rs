@@ -115,7 +115,7 @@ pub fn dump() -> io::Result<()> {
 
     fs::create_dir_all("logs").unwrap();
     for (date, entries) in days {
-        let mut writer = csv::Writer::from_path(&format!("logs/{date}.log")).unwrap();
+        let mut writer = csv::Writer::from_path(format!("logs/{date}.log")).unwrap();
         for (timestamp, id) in entries {
             writer
                 .write_record(&[timestamp.to_rfc3339(), id.to_string()])

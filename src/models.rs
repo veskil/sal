@@ -1,13 +1,13 @@
 use chrono::{DateTime, TimeDelta, Utc};
 use ratatui::{
     style::Stylize,
-    text::{Span, Text, ToSpan, ToText},
+    text::Span,
 };
 use rusqlite::Connection;
 
 pub fn get_db() -> Connection {
-    let conn = Connection::open("sal.db").unwrap();
-    return conn;
+    
+    Connection::open("sal.db").unwrap()
 }
 
 /// Tablename `logs`
@@ -76,7 +76,7 @@ fn get_days(uid: u64, conn: Connection) -> Vec<Day> {
         DATE(timestamp)
     ";
 
-    let mut stmt = conn.prepare(&query).unwrap();
+    let mut stmt = conn.prepare(query).unwrap();
 
     let days = stmt
         .query_map([uid], |row| {
