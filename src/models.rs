@@ -1,4 +1,8 @@
 use chrono::{DateTime, TimeDelta, Utc};
+use ratatui::{
+    style::Stylize,
+    text::{Span, Text, ToSpan, ToText},
+};
 use rusqlite::Connection;
 
 pub fn get_db() -> Connection {
@@ -18,11 +22,12 @@ pub struct Log {
 pub struct Person {
     pub id: u64,
     pub username: String,
+    pub stats: Stats,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Stats {
-    pub longest_day: TimeDelta,
+    pub longest_day: Day,
 }
 
 impl Person {
@@ -35,44 +40,91 @@ impl Person {
             })
             .unwrap();
 
+        let stats = Stats::load_for_user(uid);
+
         Self {
             id: uid,
-            username: username,
+            username,
+            stats,
         }
     }
+}
 
-    pub fn get_stats(&self) -> Stats {
+impl Stats {
+    fn load_for_user(uid: u64) -> Self {
         let conn = get_db();
 
-        let longest_day = self.get_longest_day(conn);
+        let days = get_days(uid, conn);
+        let longest_day = get_longest_day(&days);
 
-        Stats { longest_day }
+        Self { longest_day }
+    }
+}
+
+fn get_days(uid: u64, conn: Connection) -> Vec<Day> {
+    let query = "
+    SELECT
+        DATE(timestamp) AS day,
+        MIN(timestamp) AS first_timestamp,
+        MAX(timestamp) AS last_timestamp,
+        JULIANDAY(MAX(timestamp)) - JULIANDAY(MIN(timestamp)) AS difference_in_days
+    FROM
+        logs
+    WHERE
+        id = (?1)
+    GROUP BY
+        DATE(timestamp)
+    ";
+
+    let mut stmt = conn.prepare(&query).unwrap();
+
+    let days = stmt
+        .query_map([uid], |row| {
+            let start: DateTime<Utc> = row.get(1).unwrap();
+            let end: DateTime<Utc> = row.get(2).unwrap();
+
+            Ok(Day::new(start, end))
+        })
+        .unwrap();
+    let days: Result<Vec<_>, _> = days.collect();
+    days.unwrap()
+}
+
+fn get_longest_day(days: &[Day]) -> Day {
+    *days.iter().max_by_key(|day| day.span()).unwrap()
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Day {
+    pub start: DateTime<Utc>,
+    pub end: DateTime<Utc>,
+}
+
+impl Day {
+    pub fn new(start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
+        Self { start, end }
     }
 
-    fn get_longest_day(&self, conn: Connection) -> TimeDelta {
-        let query = "
-        SELECT
-            DATE(timestamp) AS day,
-            MIN(timestamp) AS first_timestamp,
-            MAX(timestamp) AS last_timestamp,
-            JULIANDAY(MAX(timestamp)) - JULIANDAY(MIN(timestamp)) AS difference_in_days
-        FROM
-            logs
-        GROUP BY
-            DATE(timestamp)
-        ORDER BY
-            difference_in_days DESC";
+    pub fn to_string(&self) -> Vec<Span<'_>> {
+        let diff = self.end - self.start;
+        let diff_formatted = format!(
+            "{} timer og {} minutter",
+            diff.num_hours(),
+            diff.num_minutes() % 60
+        );
+        vec![
+            "Lengste dag: ".into(),
+            self.start.format("%d/%m").to_string().yellow(),
+            ". Fra ".into(),
+            self.start.format("%H:%M").to_string().yellow(),
+            " til: ".into(),
+            self.end.format("%H:%M").to_string().yellow(),
+            ". Det er hele ".into(),
+            diff_formatted.green(),
+        ]
+    }
 
-        let longest_day = conn
-            .query_row(&query, [], |row| {
-                let ld: f64 = row.get(3).unwrap();
-                let ld_seconds = ld * 24.0 * 60.0 * 60.0;
-                eprintln!("{ld_seconds}");
-                let delta = TimeDelta::seconds(ld_seconds as i64);
-                Ok(delta)
-            })
-            .unwrap();
-
-        return longest_day;
+    pub fn span(&self) -> TimeDelta {
+        self.end - self.start
     }
 }

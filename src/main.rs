@@ -4,7 +4,6 @@ mod models;
 use std::io;
 use std::time::{Duration, Instant};
 
-use chrono::TimeDelta;
 use clap::{Parser, Subcommand};
 use migrate::{dump, migrate};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
@@ -145,10 +144,6 @@ impl App {
         self.current_user = Some(Person::load(uid));
     }
 
-    fn exit(&mut self) {
-        self.exit = true;
-    }
-
     fn increment_counter(&mut self) {}
 
     fn decrement_counter(&mut self) {}
@@ -170,24 +165,21 @@ impl Widget for &App {
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
-        let username = match &self.current_user {
-            None => "utlogget",
-            Some(user) => &user.username,
+        let text = match &self.current_user {
+            None => Text::from(vec![Line::from(vec!["Utlogget".yellow()])]),
+            Some(user) => {
+                let longest_day = user.stats.longest_day.to_string();
+                Text::from(vec![
+                    Line::from(vec![
+                        "Velkommen ".into(),
+                        user.username.to_string().yellow(),
+                    ]),
+                    Line::from(longest_day),
+                ])
+            }
         };
 
-        let longest_day = match &self.current_user {
-            None => TimeDelta::zero(),
-            Some(user) => user.get_stats().longest_day,
-        };
-
-        let counter_text = Text::from(vec![Line::from(vec![
-            "Value: ".into(),
-            username.to_string().yellow(),
-            "Longest day".into(),
-            longest_day.to_string().blue(),
-        ])]);
-
-        Paragraph::new(counter_text)
+        Paragraph::new(text)
             .centered()
             .block(block)
             .render(area, buf);
