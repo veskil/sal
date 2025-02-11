@@ -1,3 +1,5 @@
+mod custom_sparkline;
+mod github_map;
 mod migrate;
 mod models;
 
@@ -5,19 +7,21 @@ use std::io;
 use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand};
+use github_map::GithubMap;
 use migrate::{dump, migrate};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::layout::{Constraint, Layout};
+use ratatui::widgets::canvas::Canvas;
 use ratatui::{
-    buffer::Buffer,
     layout::Rect,
     style::Stylize,
     symbols::border,
     text::{Line, Text},
-    widgets::{Block, Paragraph, Widget},
+    widgets::{Block, Paragraph, Sparkline},
     DefaultTerminal, Frame,
 };
 
-use models::Person;
+use models::{Person, MS_IN_A_DAY};
 
 #[derive(Parser)]
 struct Cli {
@@ -46,6 +50,7 @@ fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
     let app_result = App::new().run(&mut terminal);
     ratatui::restore();
+    println!("Salstatistikk avsluttet eller crashet. For å starte på nytt, klikk pil opp og enter eller skriv `cargo run`");
     app_result
 }
 
@@ -102,7 +107,15 @@ impl App {
     }
 
     fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
+        let chunks = Layout::vertical([
+            Constraint::Length(9),
+            Constraint::Min(8),
+            Constraint::Length(16),
+        ])
+        .split(frame.area());
+        render_welcome_box(frame, self, chunks[0]);
+        render_sparkline(frame, self, chunks[1]);
+        render_github_stats(frame, self, chunks[2]);
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -145,7 +158,7 @@ impl App {
             match c.to_ascii_lowercase() {
                 'q' => self.exit = true,
                 'm' => self.beep_user(394769250),
-                'n' => self.beep_user(394769250),
+                'n' => self.beep_user(331142554),
                 'b' => self.current_user = None,
                 _ => (),
             }
@@ -163,40 +176,98 @@ impl App {
     fn decrement_counter(&mut self) {}
 }
 
-impl Widget for &App {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" Salstatistikk ".bold());
-        let instructions = Line::from(vec![
-            " Decrement ".into(),
-            "<Left>".blue().bold(),
-            " Increment ".into(),
-            "<Right>".blue().bold(),
-            " Quit ".into(),
-            "<Q> ".blue().bold(),
-        ]);
-        let block = Block::bordered()
-            .title(title.centered())
-            .title_bottom(instructions.centered())
-            .border_set(border::THICK);
+fn render_welcome_box(frame: &mut Frame, app: &App, area: Rect) {
+    let title = Line::from(" Salstatistikk ".bold());
+    let instructions = Line::from(vec![
+        " Decrement ".into(),
+        "<Left>".blue().bold(),
+        " Increment ".into(),
+        "<Right>".blue().bold(),
+        " Quit ".into(),
+        "<Q> ".blue().bold(),
+    ]);
+    let block = Block::bordered()
+        .title(title.centered())
+        .title_bottom(instructions.centered())
+        .border_set(border::THICK);
 
-        let text = match &self.current_user {
-            None => Text::from(vec![Line::from(vec!["Utlogget".yellow()])]),
-            Some(user) => {
-                let longest_day = user.stats.longest_day.to_span();
-                Text::from(vec![
-                    Line::from(vec![
-                        "Velkommen ".into(),
-                        user.username.to_string().yellow(),
-                    ]),
-                    Line::from(vec!["🔥".repeat(user.stats.streak).into()]),
-                    Line::from(longest_day),
-                ])
-            }
-        };
+    let text = match &app.current_user {
+        None => Text::from(vec![Line::from(vec!["Utlogget".yellow()])]),
+        Some(user) => {
+            let longest = user.stats.longest_day.stats();
+            let today = user.stats.today.stats();
+            let earliest_arrival = user.stats.earliest_arrival.stats();
+            let latest_departure = user.stats.latest_departure.stats();
+            Text::from(vec![
+                Line::from(vec![
+                    "Velkommen ".into(),
+                    user.username.to_string().yellow(),
+                ]),
+                Line::from(vec!["🔥".repeat(user.stats.streak).into()]),
+                Line::from(vec![
+                    "I dag har du vært her fra ".into(),
+                    today.start.yellow(),
+                    " som blir ".into(),
+                    today.diff.green(),
+                ]),
+                Line::from(vec![
+                    "Lengste dag: ".into(),
+                    longest.date.yellow(),
+                    ". Fra ".into(),
+                    longest.start.yellow(),
+                    " til: ".into(),
+                    longest.end.yellow(),
+                    ". Det er hele ".into(),
+                    longest.diff.green(),
+                ]),
+                Line::from(vec![
+                    "Tidligste ankomst: ".into(),
+                    earliest_arrival.start.yellow(),
+                    " den ".into(),
+                    earliest_arrival.date.yellow(),
+                ]),
+                Line::from(vec![
+                    "Seneste avreise: ".into(),
+                    latest_departure.end.yellow(),
+                    " den ".into(),
+                    latest_departure.date.yellow(),
+                ]),
+            ])
+        }
+    };
 
-        Paragraph::new(text)
-            .centered()
-            .block(block)
-            .render(area, buf);
+    let paragraph = Paragraph::new(text).centered().block(block);
+    frame.render_widget(paragraph, area);
+}
+
+fn render_sparkline(frame: &mut Frame, app: &App, area: Rect) {
+    let data = match &app.current_user {
+        None => &vec![],
+        Some(user) => &user.stats.days_milliseconds,
+    };
+
+    let maxval = data
+        .iter()
+        .chain(&[Some(MS_IN_A_DAY / 2)])
+        .max()
+        .copied()
+        .flatten()
+        .unwrap();
+
+    let sparkline = Sparkline::default()
+        .block(
+            Block::bordered().title(format!("Timer per dag - max {}", maxval / (60 * 60 * 1000))),
+        )
+        .direction(ratatui::widgets::RenderDirection::RightToLeft)
+        .data(data)
+        .max(maxval);
+
+    frame.render_widget(sparkline, area);
+}
+
+fn render_github_stats(frame: &mut Frame, app: &App, area: Rect) {
+    if let Some(user) = &app.current_user {
+        let gh_map = GithubMap::new(&user.stats.days_milliseconds);
+        frame.render_widget(gh_map, area);
     }
 }

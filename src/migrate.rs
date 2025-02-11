@@ -1,5 +1,7 @@
 use chrono::DateTime;
+use chrono::TimeDelta;
 use chrono::Utc;
+use chrono_tz::Europe::Oslo;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -11,8 +13,9 @@ pub fn migrate() -> io::Result<()> {
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS logs (
-            id    INTEGER,
+            id         INTEGER,
             timestamp  TEXT NOT NULL,
+            date       TEXT NOT NULL,
             PRIMARY KEY (id, timestamp)
         )",
         (), // empty list of parameters.
@@ -41,10 +44,11 @@ pub fn migrate() -> io::Result<()> {
             for line in rdr.records() {
                 let parts = line.unwrap();
                 let timestamp = DateTime::parse_from_rfc3339(&parts[0]).unwrap();
+                let date = (timestamp.with_timezone(&Oslo) - TimeDelta::hours(5)).date_naive();
                 let userid: u64 = parts[1].parse().unwrap();
                 let res = conn.execute(
-                    "INSERT INTO logs (id, timestamp) VALUES (?1, ?2)",
-                    (&userid, timestamp),
+                    "INSERT INTO logs (id, timestamp, date) VALUES (?1, ?2, ?3)",
+                    (&userid, &timestamp, &date),
                 );
                 match res {
                     Ok(_) => (),

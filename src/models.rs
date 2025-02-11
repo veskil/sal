@@ -1,7 +1,6 @@
-use chrono::{DateTime, Datelike, TimeDelta, Utc, Weekday};
+use chrono::{DateTime, Datelike, NaiveDate, TimeDelta, Utc, Weekday};
 use chrono_tz::{Europe::Oslo, Tz};
 use itertools::Itertools;
-use ratatui::{style::Stylize, text::Span};
 use rusqlite::Connection;
 
 pub fn get_db() -> Connection {
@@ -13,6 +12,8 @@ pub fn get_db() -> Connection {
 #[derive(Debug)]
 pub struct Log {
     timestamp: DateTime<Utc>,
+    /// Date of beep-time minus five hours in Oslo time
+    date: NaiveDate,
     id: u64,
 }
 
@@ -59,9 +60,11 @@ impl Person {
 
     pub fn register(uid: u64) {
         let conn = get_db();
+        let now = Utc::now();
+        let date = (now.with_timezone(&Oslo) - TimeDelta::hours(5)).date_naive();
         conn.execute(
-            "INSERT INTO logs (id, timestamp) VALUES (?1, ?2)",
-            (uid, Utc::now()),
+            "INSERT INTO logs (id, timestamp, date) VALUES (?1, ?2, ?3)",
+            (&uid, &now, &date),
         )
         .unwrap();
     }
@@ -69,8 +72,12 @@ impl Person {
 
 #[derive(Debug)]
 pub struct Stats {
-    pub longest_day: Day,
     pub streak: usize,
+    pub longest_day: Day,
+    pub today: Day,
+    pub earliest_arrival: Day,
+    pub latest_departure: Day,
+    pub days_milliseconds: Vec<Option<u64>>,
 }
 
 impl Stats {
@@ -78,12 +85,20 @@ impl Stats {
         let conn = get_db();
 
         let days = get_days(uid, uid2, conn);
-        let longest_day = get_longest_day(&days);
         let streak = get_streak(&days);
+        let today = days[0];
+        let longest_day = get_longest_day(&days);
+        let earliest_arrival = get_earliest(&days);
+        let latest_departure = get_latest(&days);
+        let fractions = get_milliseconds(&days);
 
         Self {
-            longest_day,
             streak,
+            longest_day,
+            today,
+            earliest_arrival,
+            latest_departure,
+            days_milliseconds: fractions,
         }
     }
 }
@@ -91,7 +106,7 @@ impl Stats {
 fn get_days(uid: u64, uid2: Option<u64>, conn: Connection) -> Vec<Day> {
     let query = "
     SELECT
-        DATE(timestamp) AS day,
+        date,
         MIN(timestamp) AS first_timestamp,
         MAX(timestamp) AS last_timestamp,
         JULIANDAY(MAX(timestamp)) - JULIANDAY(MIN(timestamp)) AS difference_in_days
@@ -102,7 +117,7 @@ fn get_days(uid: u64, uid2: Option<u64>, conn: Connection) -> Vec<Day> {
     GROUP BY
         DATE(timestamp, '-5 hours', 'localtime')
     ORDER BY
-        day DESC
+        date DESC
     ";
 
     let mut stmt = conn.prepare(query).unwrap();
@@ -153,6 +168,40 @@ fn get_streak(days: &[Day]) -> usize {
     streak
 }
 
+fn get_earliest(days: &[Day]) -> Day {
+    *days
+        .into_iter()
+        .min_by_key(|d| (d.start - TimeDelta::hours(5)).time())
+        .unwrap()
+}
+
+fn get_latest(days: &[Day]) -> Day {
+    *days
+        .into_iter()
+        .max_by_key(|d| (d.end - TimeDelta::hours(5)).time())
+        .unwrap()
+}
+
+pub const MS_IN_A_DAY: u64 = 24 * 60 * 60 * 1000;
+
+fn get_milliseconds(days: &[Day]) -> Vec<Option<u64>> {
+    let last_day = days[0].date();
+    let first_day = days[days.len() - 1].date();
+    let num_days = (last_day - first_day).num_days();
+    let mut milliseconds = Vec::with_capacity(num_days as usize);
+    // From today, backwards
+    for (day, prev_day) in days.iter().circular_tuple_windows() {
+        milliseconds.push(Some(day.span().num_milliseconds() as u64));
+        let mut moving_day = day.start - TimeDelta::days(1) - TimeDelta::hours(5);
+        while moving_day.date_naive() > prev_day.date() {
+            milliseconds.push(None);
+            moving_day -= TimeDelta::days(1);
+        }
+    }
+
+    milliseconds
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Day {
     pub start: DateTime<Tz>,
@@ -166,26 +215,40 @@ impl Day {
         Self { start, end }
     }
 
-    pub fn to_span(&self) -> Vec<Span<'_>> {
+    pub fn stats(&self) -> DayStats {
         let diff = self.end - self.start;
-        let diff_formatted = format!(
-            "{} timer og {} minutter",
-            diff.num_hours(),
-            diff.num_minutes() % 60
-        );
-        vec![
-            "Lengste dag: ".into(),
-            self.start.format("%d/%m").to_string().yellow(),
-            ". Fra ".into(),
-            self.start.format("%H:%M").to_string().yellow(),
-            " til: ".into(),
-            self.end.format("%H:%M").to_string().yellow(),
-            ". Det er hele ".into(),
-            diff_formatted.green(),
-        ]
+        let diff_formatted = match diff.num_hours() {
+            1.. => format!(
+                "{} timer og {} minutter",
+                diff.num_hours(),
+                diff.num_minutes() % 60
+            ),
+            ..=0 => format!(
+                "{} minutter og {} sekunder",
+                diff.num_minutes() % 60,
+                diff.num_seconds() % 60
+            ),
+        };
+        DayStats {
+            date: self.start.format("%d/%m").to_string(),
+            start: self.start.format("%H:%M").to_string(),
+            end: self.end.format("%H:%M").to_string(),
+            diff: diff_formatted,
+        }
     }
 
     pub fn span(&self) -> TimeDelta {
         self.end - self.start
     }
+
+    pub fn date(&self) -> NaiveDate {
+        (self.start - TimeDelta::hours(5)).date_naive()
+    }
+}
+
+pub struct DayStats {
+    pub date: String,
+    pub start: String,
+    pub end: String,
+    pub diff: String,
 }
