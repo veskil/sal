@@ -1,27 +1,28 @@
-mod custom_sparkline;
 mod github_map;
 mod migrate;
 mod models;
+mod username_popup;
 
 use std::io;
 use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand};
-use github_map::GithubMap;
+use github_map::{github_map_instructions, GithubMap};
 use migrate::{dump, migrate};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::{Constraint, Layout};
-use ratatui::widgets::canvas::Canvas;
 use ratatui::{
     layout::Rect,
     style::Stylize,
     symbols::border,
     text::{Line, Text},
-    widgets::{Block, Paragraph, Sparkline},
+    widgets::{Block, Paragraph},
     DefaultTerminal, Frame,
 };
 
-use models::{Person, MS_IN_A_DAY};
+use models::Person;
+use tui_textarea::TextArea;
+use username_popup::{handle_username_input, render_username_popup};
 
 #[derive(Parser)]
 struct Cli {
@@ -55,22 +56,34 @@ fn main() -> io::Result<()> {
 }
 
 #[derive(Debug)]
-pub struct App {
+pub struct App<'a> {
     exit: bool,
     buffer: String,
     last_input: Instant,
     current_user: Option<Person>,
+    textarea: TextArea<'a>,
+    reading_username: bool,
 }
 
 const TIMEOUT: Duration = Duration::from_millis(20);
 
-impl App {
+impl<'a> App<'a> {
     fn new() -> Self {
+        let mut textarea = TextArea::default();
+        textarea.set_block(
+            Block::bordered()
+                .blue()
+                .title("Oppdater brukernavn")
+                .title_bottom("Avbryt <Esc> Bekreft <Enter>"),
+        );
+
         Self {
             exit: false,
             buffer: String::with_capacity(12),
             last_input: Instant::now(),
             current_user: None,
+            textarea,
+            reading_username: false,
         }
     }
 
@@ -107,19 +120,20 @@ impl App {
     }
 
     fn draw(&self, frame: &mut Frame) {
-        let chunks = Layout::vertical([
-            Constraint::Length(9),
-            Constraint::Min(8),
-            Constraint::Length(16),
-        ])
-        .split(frame.area());
+        let chunks = Layout::vertical([Constraint::Length(14), Constraint::Min(2 + 7 * 4)])
+            .split(frame.area());
         render_welcome_box(frame, self, chunks[0]);
-        render_sparkline(frame, self, chunks[1]);
-        render_github_stats(frame, self, chunks[2]);
+        render_github_stats(frame, self, chunks[1]);
+
+        if self.reading_username {
+            render_username_popup(frame, self, frame.area());
+        }
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
+            // If the popup is open, it is responsible for handling inputs
+            input if self.reading_username => handle_username_input(input, self),
             // it's important to check that the event is a key press event as
             // crossterm also emits key release and repeat events on Windows.
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
@@ -132,13 +146,24 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Char(c) => {
-                self.buffer.push(c);
-                self.last_input = Instant::now();
-            }
             KeyCode::Left => self.decrement_counter(),
             KeyCode::Right => self.increment_counter(),
             KeyCode::Esc => self.exit = true,
+            KeyCode::Char(c) if c.is_numeric() => {
+                self.buffer.push(c);
+                self.last_input = Instant::now();
+            }
+            KeyCode::Char(c) => match c.to_ascii_lowercase() {
+                'm' => self.beep_user(394769250),
+                'n' => self.beep_user(331142554),
+                'b' => self.current_user = None,
+                'u' => {
+                    if let Some(_) = self.current_user {
+                        self.reading_username = true
+                    }
+                }
+                _ => (),
+            },
             _ => {}
         }
     }
@@ -152,16 +177,6 @@ impl App {
                 return;
             };
             self.beep_user(uid);
-        }
-        if self.buffer.len() == 1 {
-            let c = self.buffer.chars().next().unwrap();
-            match c.to_ascii_lowercase() {
-                'q' => self.exit = true,
-                'm' => self.beep_user(394769250),
-                'n' => self.beep_user(331142554),
-                'b' => self.current_user = None,
-                _ => (),
-            }
         }
     }
 
@@ -179,12 +194,12 @@ impl App {
 fn render_welcome_box(frame: &mut Frame, app: &App, area: Rect) {
     let title = Line::from(" Salstatistikk ".bold());
     let instructions = Line::from(vec![
-        " Decrement ".into(),
-        "<Left>".blue().bold(),
-        " Increment ".into(),
-        "<Right>".blue().bold(),
-        " Quit ".into(),
-        "<Q> ".blue().bold(),
+        " Logg inn ".into(),
+        "<Beep kortet>".blue().bold(),
+        " Logg ut ".into(),
+        "<B>".blue().bold(),
+        " Lukk appen ".into(),
+        "<Esc> ".blue().bold(),
     ]);
     let block = Block::bordered()
         .title(title.centered())
@@ -240,34 +255,18 @@ fn render_welcome_box(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-fn render_sparkline(frame: &mut Frame, app: &App, area: Rect) {
-    let data = match &app.current_user {
-        None => &vec![],
-        Some(user) => &user.stats.days_milliseconds,
-    };
-
-    let maxval = data
-        .iter()
-        .chain(&[Some(MS_IN_A_DAY / 2)])
-        .max()
-        .copied()
-        .flatten()
-        .unwrap();
-
-    let sparkline = Sparkline::default()
-        .block(
-            Block::bordered().title(format!("Timer per dag - max {}", maxval / (60 * 60 * 1000))),
-        )
-        .direction(ratatui::widgets::RenderDirection::RightToLeft)
-        .data(data)
-        .max(maxval);
-
-    frame.render_widget(sparkline, area);
-}
-
 fn render_github_stats(frame: &mut Frame, app: &App, area: Rect) {
     if let Some(user) = &app.current_user {
+        let title = Line::centered(" Oppmøtehistorikk ".into()).blue();
+        let instrs = Line::from(github_map_instructions()).centered();
+        let block = Block::bordered()
+            .title(title.centered())
+            .title_bottom(instrs.bold())
+            .border_set(border::THICK);
+
+        frame.render_widget(&block, area);
+        let inner = block.inner(area);
         let gh_map = GithubMap::new(&user.stats.days_milliseconds);
-        frame.render_widget(gh_map, area);
+        frame.render_widget(gh_map, inner);
     }
 }

@@ -68,6 +68,16 @@ impl Person {
         )
         .unwrap();
     }
+
+    pub fn set_username(&self, username: &str) {
+        let conn = get_db();
+        conn.execute(
+            "INSERT INTO people (id, username) VALUES (?1, ?2) 
+                    ON CONFLICT (id) DO UPDATE SET username=excluded.username",
+            (&self.id, username),
+        )
+        .unwrap();
+    }
 }
 
 #[derive(Debug)]
@@ -181,8 +191,6 @@ fn get_latest(days: &[Day]) -> Day {
         .max_by_key(|d| (d.end - TimeDelta::hours(5)).time())
         .unwrap()
 }
-
-pub const MS_IN_A_DAY: u64 = 24 * 60 * 60 * 1000;
 
 fn get_milliseconds(days: &[Day]) -> Vec<Option<u64>> {
     let last_day = days[0].date();
