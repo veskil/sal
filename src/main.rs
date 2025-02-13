@@ -13,6 +13,7 @@ use migrate::{dump, migrate};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::Style;
+use ratatui::text::ToSpan;
 use ratatui::widgets::Padding;
 use ratatui::{
     layout::Rect,
@@ -200,9 +201,11 @@ fn render_welcome_box(frame: &mut Frame, app: &App, area: Rect) {
     let title = Line::from(" Salstatistikk ".bold());
     let instructions = Line::from(vec![
         " Logg inn ".into(),
-        "<Beep kortet>".blue().bold(),
+        "<Tæpp kortet>".blue().bold(),
         " Logg ut ".into(),
         "<B>".blue().bold(),
+        " Endre brukernavn ".into(),
+        "<U>".blue().bold(),
         " Lukk appen ".into(),
         "<Esc> ".blue().bold(),
     ]);
@@ -265,6 +268,14 @@ fn render_welcome_box(frame: &mut Frame, app: &App, area: Rect) {
                         latest_departure.end.yellow(),
                         " den ".into(),
                         latest_departure.date.yellow(),
+                    ]),
+                    Line::from(vec![
+                        "Antall møtte siste syv dager: ".into(),
+                        user.stats.last_week_count.to_span().yellow(),
+                    ]),
+                    Line::from(vec![
+                        "Antall møtte siste 30 dager: ".into(),
+                        user.stats.last_month_count.to_span().yellow(),
                     ]),
                 ]
                 .into_iter()

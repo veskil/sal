@@ -23,15 +23,22 @@ pub fn migrate() -> io::Result<()> {
     .unwrap();
 
     conn.execute(
-        "CREATE INDEX logs_timestamp_idx
+        "CREATE INDEX IF NOT EXISTS logs_id_idx
+        ON logs (id)",
+        (), // empty list of parameters.
+    )
+    .unwrap();
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS logs_timestamp_idx
             ON logs (timestamp)",
         (), // empty list of parameters.
     )
     .unwrap();
 
     conn.execute(
-        "CREATE INDEX logs_id_idx
-            ON logs (id)",
+        "CREATE INDEX IF NOT EXISTS logs_date_idx
+            ON logs (date)",
         (), // empty list of parameters.
     )
     .unwrap();
@@ -68,7 +75,7 @@ pub fn migrate() -> io::Result<()> {
     .unwrap();
 
     conn.execute(
-        "CREATE INDEX people_id_idx
+        "CREATE INDEX IF NOT EXISTS people_id_idx
             ON people(id)",
         (), // empty list of parameters.
     )
@@ -90,6 +97,8 @@ pub fn migrate() -> io::Result<()> {
             Err(err) => println!("{err:?}"),
         }
     }
+
+    add_coffee_table()?;
 
     Ok(())
 }
@@ -141,6 +150,43 @@ pub fn dump() -> io::Result<()> {
 
     let dumped = json::stringify_pretty(user_map, 2);
     fs::write("users.json", dumped).unwrap();
+
+    Ok(())
+}
+
+pub fn add_coffee_table() -> io::Result<()> {
+    let conn = get_db();
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS coffee (
+            id    INTEGER PRIMARY KEY,
+            timestamp  TEXT NOT NULL,
+            date       TEXT NOT NULL
+        )",
+        (), // empty list of parameters.
+    )
+    .unwrap();
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS coffee_id_idx
+            ON coffee(id)",
+        (), // empty list of parameters.
+    )
+    .unwrap();
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS coffee_timestamp_idx
+            ON coffee (timestamp)",
+        (), // empty list of parameters.
+    )
+    .unwrap();
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS coffee_date_idx
+            ON coffee (date)",
+        (), // empty list of parameters.
+    )
+    .unwrap();
 
     Ok(())
 }

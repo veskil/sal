@@ -87,7 +87,10 @@ pub struct Stats {
     pub today: Day,
     pub earliest_arrival: Day,
     pub latest_departure: Day,
+    pub days: Vec<DayOrDate>,
     pub days_milliseconds: Vec<Option<u64>>,
+    pub last_week_count: usize,
+    pub last_month_count: usize,
 }
 
 impl Stats {
@@ -95,12 +98,15 @@ impl Stats {
         let conn = get_db();
 
         let days = get_days(uid, uid2, conn);
-        let streak = get_streak(&days);
+        let day_or_dates = days.as_slice().iter_option();
+        let streak = get_streak(&day_or_dates);
         let today = days[0];
         let longest_day = get_longest_day(&days);
         let earliest_arrival = get_earliest(&days);
         let latest_departure = get_latest(&days);
-        let fractions = get_milliseconds(&days);
+        let days_milliseconds = get_milliseconds(&day_or_dates);
+        let last_week_count = get_last_n(7, &day_or_dates);
+        let last_month_count = get_last_n(30, &day_or_dates);
 
         Self {
             streak,
@@ -108,7 +114,10 @@ impl Stats {
             today,
             earliest_arrival,
             latest_departure,
-            days_milliseconds: fractions,
+            days: day_or_dates,
+            days_milliseconds,
+            last_week_count,
+            last_month_count,
         }
     }
 }
@@ -150,33 +159,16 @@ fn get_longest_day(days: &[Day]) -> Day {
     *days.iter().max_by_key(|day| day.span()).unwrap()
 }
 
-fn get_streak(days: &[Day]) -> usize {
-    let mut streak = 1;
-
-    // (today, yesterday), (yesterday, yesyesterday) etc
-    for (day, prev_day) in days.iter().tuple_windows() {
-        let day = day.date;
-        let prev_day = prev_day.date;
-        if day == prev_day {
-            continue;
-        }
-
-        let mut btwn = day - TimeDelta::days(1);
-        let mut streak_good = true;
-        while btwn != prev_day {
-            if !(btwn.weekday() == Weekday::Sat || btwn.weekday() == Weekday::Sun) {
-                streak_good = false;
-                break;
+fn get_streak(days: &[DayOrDate]) -> usize {
+    days.iter()
+        .take_while(|day| match day {
+            DayOrDate::Unregistered(date) => {
+                date.weekday() == Weekday::Sun || date.weekday() == Weekday::Sat
             }
-
-            btwn -= TimeDelta::days(1);
-        }
-        if !streak_good {
-            break;
-        }
-        streak += 1;
-    }
-    streak
+            DayOrDate::Registered(_) => true,
+        })
+        .filter(|day| day.is_registered())
+        .count()
 }
 
 fn get_earliest(days: &[Day]) -> Day {
@@ -193,22 +185,20 @@ fn get_latest(days: &[Day]) -> Day {
         .unwrap()
 }
 
-fn get_milliseconds(days: &[Day]) -> Vec<Option<u64>> {
-    let last_day = days[0].date();
-    let first_day = days[days.len() - 1].date();
-    let num_days = (last_day - first_day).num_days();
-    let mut milliseconds = Vec::with_capacity(num_days as usize);
-    // From today, backwards
-    for (day, prev_day) in days.iter().circular_tuple_windows() {
-        milliseconds.push(Some(day.span().num_milliseconds() as u64));
-        let mut moving_day = day.start - TimeDelta::days(1) - TimeDelta::hours(5);
-        while moving_day.date_naive() > prev_day.date() {
-            milliseconds.push(None);
-            moving_day -= TimeDelta::days(1);
-        }
-    }
+fn get_milliseconds(days: &[DayOrDate]) -> Vec<Option<u64>> {
+    days.iter()
+        .map(|day| match day {
+            DayOrDate::Unregistered(_) => None,
+            DayOrDate::Registered(day) => Some(day.span().num_milliseconds() as u64),
+        })
+        .collect()
+}
 
-    milliseconds
+fn get_last_n(n: usize, days: &[DayOrDate]) -> usize {
+    days.iter()
+        .take(n)
+        .filter(|day| day.is_registered())
+        .count()
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -250,10 +240,6 @@ impl Day {
     pub fn span(&self) -> TimeDelta {
         self.end - self.start
     }
-
-    pub fn date(&self) -> NaiveDate {
-        (self.start - TimeDelta::hours(5)).date_naive()
-    }
 }
 
 pub struct DayStats {
@@ -261,4 +247,53 @@ pub struct DayStats {
     pub start: String,
     pub end: String,
     pub diff: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DayOrDate {
+    Registered(Day),
+    Unregistered(NaiveDate),
+}
+
+impl DayOrDate {
+    fn date(&self) -> NaiveDate {
+        match self {
+            &DayOrDate::Registered(day) => day.date,
+            &DayOrDate::Unregistered(date) => date,
+        }
+    }
+
+    fn is_registered(&self) -> bool {
+        match self {
+            DayOrDate::Registered(_) => true,
+            DayOrDate::Unregistered(_) => false,
+        }
+    }
+}
+
+pub trait DayVec {
+    fn iter_option(&self) -> Vec<DayOrDate>;
+}
+
+impl DayVec for &[Day] {
+    fn iter_option(&self) -> Vec<DayOrDate> {
+        let n_days = (self[0].date - self.last().unwrap().date).num_days() + 1;
+        let mut output = Vec::with_capacity(n_days as usize);
+        for (day, prev_day) in self.iter().tuple_windows() {
+            output.push(DayOrDate::Registered(*day));
+            let day = day.date;
+            let prev_day = prev_day.date;
+            if day == prev_day {
+                continue;
+            }
+
+            let mut btwn = day - TimeDelta::days(1);
+            while btwn != prev_day {
+                output.push(DayOrDate::Unregistered(btwn));
+
+                btwn -= TimeDelta::days(1);
+            }
+        }
+        output
+    }
 }
