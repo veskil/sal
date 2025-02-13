@@ -8,9 +8,12 @@ use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand};
 use github_map::{github_map_instructions, GithubMap};
+use itertools::Itertools;
 use migrate::{dump, migrate};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::{Constraint, Layout};
+use ratatui::style::Style;
+use ratatui::widgets::Padding;
 use ratatui::{
     layout::Rect,
     style::Stylize,
@@ -70,9 +73,11 @@ const TIMEOUT: Duration = Duration::from_millis(20);
 impl<'a> App<'a> {
     fn new() -> Self {
         let mut textarea = TextArea::default();
+        textarea.set_style(Style::default().white().on_blue());
         textarea.set_block(
             Block::bordered()
-                .blue()
+                .white()
+                .on_blue()
                 .title("Oppdater brukernavn")
                 .title_bottom("Avbryt <Esc> Bekreft <Enter>"),
         );
@@ -207,51 +212,71 @@ fn render_welcome_box(frame: &mut Frame, app: &App, area: Rect) {
         .border_set(border::THICK);
 
     let text = match &app.current_user {
-        None => Text::from(vec![Line::from(vec!["Utlogget".yellow()])]),
+        None => {
+            let _ = 1;
+
+            Text::from(vec![
+                Line::from("Instruksjoner: ".blue()),
+                Line::from(""),
+                Line::from("Tæpp NTNU-kortet ditt på kortleseren for å registrere oppmøte."),
+                Line::from("Det er kun første og siste tæpp for dagen* som har noe å si for statistikken, de tolkes som ankomst og avreise"),
+                Line::from(""),
+                Line::from("Noen kort inneholder to nummer. Dersom du registrerer begge på samme brukernavn blir de ansett som samme bruker."),
+                Line::from(""),
+                Line::from("*Dagen varer fra 05:00 til 04:59.".italic()),
+            ].into_iter().map(|line| line.left_aligned()).collect_vec())
+        }
         Some(user) => {
             let longest = user.stats.longest_day.stats();
             let today = user.stats.today.stats();
             let earliest_arrival = user.stats.earliest_arrival.stats();
             let latest_departure = user.stats.latest_departure.stats();
-            Text::from(vec![
-                Line::from(vec![
-                    "Velkommen ".into(),
-                    user.username.to_string().yellow(),
-                ]),
-                Line::from(vec!["🔥".repeat(user.stats.streak).into()]),
-                Line::from(vec![
-                    "I dag har du vært her fra ".into(),
-                    today.start.yellow(),
-                    " som blir ".into(),
-                    today.diff.green(),
-                ]),
-                Line::from(vec![
-                    "Lengste dag: ".into(),
-                    longest.date.yellow(),
-                    ". Fra ".into(),
-                    longest.start.yellow(),
-                    " til: ".into(),
-                    longest.end.yellow(),
-                    ". Det er hele ".into(),
-                    longest.diff.green(),
-                ]),
-                Line::from(vec![
-                    "Tidligste ankomst: ".into(),
-                    earliest_arrival.start.yellow(),
-                    " den ".into(),
-                    earliest_arrival.date.yellow(),
-                ]),
-                Line::from(vec![
-                    "Seneste avreise: ".into(),
-                    latest_departure.end.yellow(),
-                    " den ".into(),
-                    latest_departure.date.yellow(),
-                ]),
-            ])
+            Text::from(
+                vec![
+                    Line::from(vec![
+                        "Velkommen ".into(),
+                        user.username.to_string().yellow(),
+                    ]),
+                    Line::from(vec!["🔥".repeat(user.stats.streak).into()]),
+                    Line::from(vec![
+                        "I dag har du vært her fra ".into(),
+                        today.start.yellow(),
+                        " som blir ".into(),
+                        today.diff.green(),
+                    ]),
+                    Line::from(vec![
+                        "Lengste dag: ".into(),
+                        longest.date.yellow(),
+                        ". Fra ".into(),
+                        longest.start.yellow(),
+                        " til: ".into(),
+                        longest.end.yellow(),
+                        ". Det er hele ".into(),
+                        longest.diff.green(),
+                    ]),
+                    Line::from(vec![
+                        "Tidligste ankomst: ".into(),
+                        earliest_arrival.start.yellow(),
+                        " den ".into(),
+                        earliest_arrival.date.yellow(),
+                    ]),
+                    Line::from(vec![
+                        "Seneste avreise: ".into(),
+                        latest_departure.end.yellow(),
+                        " den ".into(),
+                        latest_departure.date.yellow(),
+                    ]),
+                ]
+                .into_iter()
+                .map(|line| line.left_aligned())
+                .collect_vec(),
+            )
         }
     };
 
-    let paragraph = Paragraph::new(text).centered().block(block);
+    let paragraph = Paragraph::new(text)
+        .centered()
+        .block(block.padding(Padding::symmetric(5, 1)));
     frame.render_widget(paragraph, area);
 }
 
@@ -262,7 +287,8 @@ fn render_github_stats(frame: &mut Frame, app: &App, area: Rect) {
         let block = Block::bordered()
             .title(title.centered())
             .title_bottom(instrs.bold())
-            .border_set(border::THICK);
+            .border_set(border::THICK)
+            .padding(Padding::symmetric(5, 1));
 
         frame.render_widget(&block, area);
         let inner = block.inner(area);

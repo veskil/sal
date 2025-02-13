@@ -125,7 +125,7 @@ fn get_days(uid: u64, uid2: Option<u64>, conn: Connection) -> Vec<Day> {
     WHERE
         id IN (?1, ?2)
     GROUP BY
-        DATE(timestamp, '-5 hours', 'localtime')
+        date
     ORDER BY
         date DESC
     ";
@@ -134,10 +134,11 @@ fn get_days(uid: u64, uid2: Option<u64>, conn: Connection) -> Vec<Day> {
 
     let days = stmt
         .query_map([uid, uid2.unwrap_or(uid)], |row| {
+            let date: NaiveDate = row.get(0).unwrap();
             let start: DateTime<Utc> = row.get(1).unwrap();
             let end: DateTime<Utc> = row.get(2).unwrap();
 
-            Ok(Day::new(start, end))
+            Ok(Day::new(date, start, end))
         })
         .unwrap();
     let days: Result<Vec<_>, _> = days.collect();
@@ -154,21 +155,21 @@ fn get_streak(days: &[Day]) -> usize {
 
     // (today, yesterday), (yesterday, yesyesterday) etc
     for (day, prev_day) in days.iter().tuple_windows() {
-        let day = day.end - TimeDelta::hours(5);
-        let prev_day = prev_day.end - TimeDelta::hours(5);
-        if day.date_naive() == prev_day.date_naive() {
+        let day = day.date;
+        let prev_day = prev_day.date;
+        if day == prev_day {
             continue;
         }
 
         let mut btwn = day - TimeDelta::days(1);
         let mut streak_good = true;
-        while btwn.date_naive() != prev_day.date_naive() {
+        while btwn != prev_day {
             if !(btwn.weekday() == Weekday::Sat || btwn.weekday() == Weekday::Sun) {
                 streak_good = false;
                 break;
             }
 
-            btwn += TimeDelta::days(1);
+            btwn -= TimeDelta::days(1);
         }
         if !streak_good {
             break;
@@ -212,15 +213,16 @@ fn get_milliseconds(days: &[Day]) -> Vec<Option<u64>> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Day {
+    pub date: NaiveDate,
     pub start: DateTime<Tz>,
     pub end: DateTime<Tz>,
 }
 
 impl Day {
-    pub fn new(start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
+    pub fn new(date: NaiveDate, start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
         let start = start.with_timezone(&Oslo);
         let end = end.with_timezone(&Oslo);
-        Self { start, end }
+        Self { date, start, end }
     }
 
     pub fn stats(&self) -> DayStats {
