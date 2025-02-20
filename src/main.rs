@@ -160,8 +160,6 @@ impl<'a> App<'a> {
                 self.last_input = Instant::now();
             }
             KeyCode::Char(c) => match c.to_ascii_lowercase() {
-                'm' => self.beep_user(394769250),
-                'n' => self.beep_user(331142554),
                 'b' => self.current_user = None,
                 'u' => {
                     if let Some(_) = self.current_user {
