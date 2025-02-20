@@ -1,10 +1,14 @@
+use std::rc::Rc;
+
 use chrono::{DateTime, Datelike, NaiveDate, TimeDelta, Utc, Weekday};
 use chrono_tz::{Europe::Oslo, Tz};
 use itertools::Itertools;
-use rusqlite::Connection;
+use rusqlite::{types::Value, vtab::array, Connection};
 
 pub fn get_db() -> Connection {
-    Connection::open("sal.db").unwrap()
+    let db = Connection::open("sal.db").unwrap();
+    array::load_module(&db).unwrap();
+    db
 }
 
 /// Tablename `logs`
@@ -14,21 +18,21 @@ pub struct Log {
     timestamp: DateTime<Utc>,
     /// Date of beep-time minus five hours in Oslo time
     date: NaiveDate,
-    id: u64,
+    id: u32,
 }
 
 /// Tablename `people`
 #[allow(unused)]
 #[derive(Debug)]
 pub struct Person {
-    pub id: u64,
-    pub id2: Option<u64>,
+    pub id: u32,
+    pub ids: Vec<u32>,
     pub username: String,
     pub stats: Stats,
 }
 
 impl Person {
-    pub fn load(uid: u64) -> Self {
+    pub fn load(uid: u32) -> Self {
         let conn = get_db();
         let username = conn
             .query_row("SELECT username FROM people WHERE id=($1)", (uid,), |row| {
@@ -37,28 +41,31 @@ impl Person {
             })
             .unwrap_or_else(|uid| uid.to_string());
 
-        let id2: Option<u64> = conn
-            .query_row(
-                "SELECT id FROM people WHERE USERNAME=($1) AND id!=($2)",
-                (&username, uid),
-                |row| {
-                    let un = row.get(0).unwrap();
-                    Ok(un)
-                },
-            )
-            .unwrap_or(None);
+        let mut ids_stmt = conn
+            .prepare("SELECT id FROM people WHERE USERNAME=($1)")
+            .unwrap();
 
-        let stats = Stats::load_for_user(uid, id2);
+        let ids = ids_stmt
+            .query_map([&username], |row| {
+                let id: u32 = row.get(0).unwrap();
+
+                Ok(id)
+            })
+            .unwrap();
+        let ids: Result<Vec<_>, _> = ids.collect();
+        let ids = ids.unwrap();
+
+        let stats = Stats::load_for_user(&ids);
 
         Self {
             id: uid,
-            id2,
+            ids,
             username,
             stats,
         }
     }
 
-    pub fn register(uid: u64) {
+    pub fn register(uid: u32) {
         let conn = get_db();
         let now = Utc::now();
         let date = (now.with_timezone(&Oslo) - TimeDelta::hours(5)).date_naive();
@@ -94,10 +101,10 @@ pub struct Stats {
 }
 
 impl Stats {
-    fn load_for_user(uid: u64, uid2: Option<u64>) -> Self {
+    fn load_for_user(ids: &[u32]) -> Self {
         let conn = get_db();
 
-        let days = get_days(uid, uid2, conn);
+        let days = get_days(ids, conn);
         let day_or_dates = days.as_slice().iter_option();
         let streak = get_streak(&day_or_dates);
         let today = days[0];
@@ -122,7 +129,12 @@ impl Stats {
     }
 }
 
-fn get_days(uid: u64, uid2: Option<u64>, conn: Connection) -> Vec<Day> {
+fn get_days(ids: &[u32], conn: Connection) -> Vec<Day> {
+    let placeholders = std::iter::repeat("?")
+        .take(ids.len())
+        .collect::<Vec<_>>()
+        .join(",");
+
     let query = "
     SELECT
         date,
@@ -132,7 +144,7 @@ fn get_days(uid: u64, uid2: Option<u64>, conn: Connection) -> Vec<Day> {
     FROM
         logs
     WHERE
-        id IN (?1, ?2)
+        id IN rarray(?)
     GROUP BY
         date
     ORDER BY
@@ -140,9 +152,10 @@ fn get_days(uid: u64, uid2: Option<u64>, conn: Connection) -> Vec<Day> {
     ";
 
     let mut stmt = conn.prepare(query).unwrap();
-
+    let ids = ids.iter().copied().map(Value::from).collect_vec();
+    let ids = Rc::new(ids);
     let days = stmt
-        .query_map([uid, uid2.unwrap_or(uid)], |row| {
+        .query_map([ids], |row| {
             let date: NaiveDate = row.get(0).unwrap();
             let start: DateTime<Utc> = row.get(1).unwrap();
             let end: DateTime<Utc> = row.get(2).unwrap();

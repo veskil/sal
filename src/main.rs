@@ -179,14 +179,14 @@ impl<'a> App<'a> {
         //     println!("{}", self.buffer);
         // }
         if self.buffer.len() == 10 {
-            let Ok(uid): Result<u64, _> = self.buffer.parse() else {
+            let Ok(uid): Result<u32, _> = self.buffer.parse() else {
                 return;
             };
             self.beep_user(uid);
         }
     }
 
-    fn beep_user(&mut self, uid: u64) {
+    fn beep_user(&mut self, uid: u32) {
         Person::register(uid);
 
         self.current_user = Some(Person::load(uid));
