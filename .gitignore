@@ -1,3 +1,10 @@
 logs/
 stats/
 users.json
+sal.db
+sal.db-journal
+data-backup.tar.gz
+
+# Added by cargo
+
+/target
