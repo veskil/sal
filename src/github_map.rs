@@ -45,8 +45,8 @@ fn ms_to_color(milliseconds: Option<u64>) -> Color {
 
 impl<'a> Widget for GithubMap<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let width = 8;
-        let height = 4;
+        let width = 6;
+        let height = 3;
 
         let cols = (1..)
             .map(|i| area.x + area.width - width * i)
@@ -86,11 +86,11 @@ pub fn github_map_instructions() -> Vec<Span<'static>> {
     let colors = [
         (None, " Ingen oppmøte "),
         (Some(0), " Mindre enn en time/bare ett bip "),
-        (Some(MS_IN_HOUR), " En til to timer "),
-        (Some(MS_IN_2_HOURS), " To til fire timer "),
-        (Some(MS_IN_4_HOURS), " Fire til åtte timer "),
-        (Some(MS_IN_8_HOURS), " Åtte til ti timer "),
-        (Some(MS_IN_10_HOURS), " Ti til tolv timer "),
+        (Some(MS_IN_HOUR), " 1-2 timer "),
+        (Some(MS_IN_2_HOURS), " 2-4 timer "),
+        (Some(MS_IN_4_HOURS), " 4-8 timer "),
+        (Some(MS_IN_8_HOURS), " 8-10 timer "),
+        (Some(MS_IN_10_HOURS), " 10-12 timer "),
         (Some(MS_IN_12_HOURS), " Over tolv timer "),
     ]
     .map(|(time, text)| text.set_style(ms_to_color(time)));
