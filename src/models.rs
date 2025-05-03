@@ -54,6 +54,10 @@ impl Person {
                 .unwrap();
             let ids: Result<Vec<_>, _> = ids.collect();
             let ids = ids.unwrap();
+            assert!(
+                ids.len() != 0,
+                "Failed to load IDs of user. Should never happen."
+            );
             (username, ids)
         } else {
             (uid.to_string(), vec![uid])
