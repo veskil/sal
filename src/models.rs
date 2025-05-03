@@ -34,26 +34,30 @@ pub struct Person {
 impl Person {
     pub fn load(uid: u32) -> Self {
         let conn = get_db();
-        let username = conn
-            .query_row("SELECT username FROM people WHERE id=($1)", (uid,), |row| {
+        let username_res =
+            conn.query_row("SELECT username FROM people WHERE id=($1)", (uid,), |row| {
                 let un = row.get(0).unwrap();
                 Ok(un)
-            })
-            .unwrap_or_else(|uid| uid.to_string());
+            });
+        // .unwrap_or_else(|uid| uid.to_string());
+        let (username, ids) = if let Ok(username) = username_res {
+            let mut ids_stmt = conn
+                .prepare("SELECT id FROM people WHERE USERNAME=($1)")
+                .unwrap();
 
-        let mut ids_stmt = conn
-            .prepare("SELECT id FROM people WHERE USERNAME=($1)")
-            .unwrap();
+            let ids = ids_stmt
+                .query_map([&username], |row| {
+                    let id: u32 = row.get(0).unwrap();
 
-        let ids = ids_stmt
-            .query_map([&username], |row| {
-                let id: u32 = row.get(0).unwrap();
-
-                Ok(id)
-            })
-            .unwrap();
-        let ids: Result<Vec<_>, _> = ids.collect();
-        let ids = ids.unwrap();
+                    Ok(id)
+                })
+                .unwrap();
+            let ids: Result<Vec<_>, _> = ids.collect();
+            let ids = ids.unwrap();
+            (username, ids)
+        } else {
+            (uid.to_string(), vec![uid])
+        };
 
         let stats = Stats::load_for_user(&ids);
 
@@ -130,6 +134,7 @@ impl Stats {
 }
 
 fn get_days(ids: &[u32], conn: Connection) -> Vec<Day> {
+    assert!(ids.len() != 0, "Cannot get the days of nobody");
     let placeholders = std::iter::repeat("?")
         .take(ids.len())
         .collect::<Vec<_>>()
@@ -165,7 +170,13 @@ fn get_days(ids: &[u32], conn: Connection) -> Vec<Day> {
         .unwrap();
     let days: Result<Vec<_>, _> = days.collect();
 
-    days.unwrap()
+    let days = days.unwrap();
+
+    assert!(
+        days.len() != 0,
+        "Since this only runs after inserting a day, days should never be empty"
+    );
+    days
 }
 
 fn get_longest_day(days: &[Day]) -> Day {
